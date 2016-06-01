@@ -16,6 +16,8 @@ import java.io._
 import org.apache.spark.serializer._
 
 object SparkNiFiAttribute {
+  
+  
 def main(args: Array[String]) {
         // Build a Site-to-site client config with NiFi web url and output port name[spark created in step 6c]
 val conf = new SiteToSiteClient.Builder().url("http://localhost:8086/nifi").portName("spark1").buildConfig()
