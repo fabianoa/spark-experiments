@@ -22,13 +22,13 @@ object Word2VecExample {
     val sc = new SparkContext(conf)
 
     // $example on$
-    val input = sc.textFile("data/sample_lda_data.txt").map(line => line.split(" ").toSeq)
-
+    val input = sc.textFile("data/b.txt").map(line => line.replaceAll("[^a-zA-Z ]", " ").toLowerCase().split(" ").toSeq)
+   
     val word2vec = new Word2Vec()
 
     val model = word2vec.fit(input)
 
-    val synonyms = model.findSynonyms("1", 5)
+    val synonyms = model.findSynonyms("salvação", 5)
 
     for((synonym, cosineSimilarity) <- synonyms) {
       println(s"$synonym $cosineSimilarity")
