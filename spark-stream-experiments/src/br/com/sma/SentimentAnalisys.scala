@@ -11,6 +11,11 @@ import org.apache.spark.ml.feature.Tokenizer
 import org.apache.spark.ml.feature.RegexTokenizer
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.api.java.UDF1
+import org.apache.spark.sql.types.DateType
+import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.types.StructField
+import org.apache.spark.sql.types.StructType
 
 
 object SentimentAnalisys {
@@ -66,13 +71,14 @@ val sentenceDataFrame = sqlContext.createDataFrame(Seq(
 
    // usage exampe -- a tpc-ds table called catalog_page
   def schema= StructType(Array(
-          StructField("date",        DateStringType,false),
-          StructField("negativo",        FloatType,false),
-          StructField("positivo",          FloatType,false)
+          StructField("date",        StringType,false),
+          StructField("doc_id",        IntegerType,false),
+          StructField("cat",          StringType,false),
+          StructField("sub_cat",          StringType,false),
+          StructField("text",          StringType,false)
        )) 
 
-       
-  date,doc_id,cat,sub_cat,text     
+
  val df = sqlContext.read
         .format("com.databricks.spark.csv")
         .schema(schema)        
@@ -81,21 +87,21 @@ val sentenceDataFrame = sqlContext.createDataFrame(Seq(
         .option("delimiter",",")
         .option("nullValue","")
         .option("treatEmptyValuesAsNulls","true")
-        .load(filename)
+        .load("data/clippings_newformat.csv")
+
+val tokenizer = new Tokenizer().setInputCol("text").setOutputCol("words")
+//val tokenizer = new Tokenizer().setInputCol("sentence").setOutputCol("words")
 
 
 
-val tokenizer = new Tokenizer().setInputCol("sentence").setOutputCol("words")
 
-val regexTokenizer = new RegexTokenizer()
-  .setInputCol("sentence")
-  .setOutputCol("words")
-  .setPattern("\\W") // alternatively .setPattern("\\w+").setGaps(false)
-
-val tokenized = tokenizer.transform(sentenceDataFrame).registerTempTable("tmp")
+val tokenized = tokenizer.transform(df).registerTempTable("tmp")
 
 
-val rdd1 = sqlContext.sql("SELECT label, explode(words) as palavra FROM tmp").registerTempTable("sentencas")
+
+val rdd1 = sqlContext.sql("SELECT date,doc_id,cat,sub_cat, explode(words) as palavra FROM tmp").registerTempTable("sentencas")
+
+//val rdd1 = sqlContext.sql("SELECT label, explode(words) as palavra FROM tmp").registerTempTable("sentencas")
 
 
 val resultset = sqlContext.sql("SELECT *  FROM sentencas,dicionario WHERE sentencas.palavra = dicionario.palavra")
