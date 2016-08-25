@@ -20,6 +20,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.ml.feature.{HashingTF, IDF, Tokenizer}
 import org.apache.spark.sql.types.FloatType
 import org.apache.spark.sql.functions.monotonicallyIncreasingId
+import org.apache.spark.sql.types.TimestampType
 
 
 object SentimentAnalisysWithParquet {
@@ -99,6 +100,8 @@ object SentimentAnalisysWithParquet {
 					)) 
 
 
+
+
 					val dfClippings = sqlContext.read
    						.format("com.databricks.spark.csv")
 							.schema(schemaClippings)        
@@ -120,14 +123,14 @@ object SentimentAnalisysWithParquet {
 
 					val resultset = sqlContext.sql("SELECT uniqueIdColumn as doc_id , date,cat,sub_cat,text,clippings_explodidos.palavra as palavra,negativo,positivo,valencia_media,valencia_dp,alerta_media,alerta_dp  FROM clippings_explodidos LEFT OUTER JOIN dicionario_expandido ON  clippings_explodidos.palavra = dicionario_expandido.palavra LEFT OUTER JOIN dicionario_anew ON  clippings_explodidos.palavra = dicionario_anew.palavra")
 
-					resultset.filter("doc_id>50").show(50)
+					resultset.show(50)
 					
 					//resultset.select("palavra","valencia_media").distinct().filter("valencia_media is not null").orderBy("palavra").groupBy("palavra","valencia_media").count().show(1000)
 					
 					
-					resultset.select("palavra","valencia_media").filter("valencia_media is not null").orderBy("palavra").groupBy("palavra","valencia_media").count().orderBy("count").show(1000)
+					//resultset.select("palavra","valencia_media").filter("valencia_media is not null").orderBy("palavra").groupBy("palavra","valencia_media").count().orderBy("count").show(1000)
 					
-					
+					 resultset.write.parquet("data/parquet/sentimento")
 
 				 sc.stop()
 	}
