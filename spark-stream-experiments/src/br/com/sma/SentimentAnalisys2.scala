@@ -18,10 +18,9 @@ import org.apache.spark.sql.types.StructField
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.rdd.RDD
 import org.apache.spark.ml.feature.{HashingTF, IDF, Tokenizer}
-import org.apache.spark.sql.types.FloatType
 
 
-object SentimentAnalisys {
+object SentimentAnalisys2 {
   
  val conf = new SparkConf().setAppName("Word2VecExample").setMaster("local[*]")
  val sc = new SparkContext(conf)
@@ -55,22 +54,42 @@ teenagers.map(t => "Name: " + t(1)).collect().foreach(println)
   def main(args: Array[String]): Unit = {
     
     System.setProperty("hadoop.home.dir", "C:\\hadoop-common-2.2.0-bin-master");  
-     
+    
+    
     
    val parquetFile = sqlContext.parquetFile("data/parquet/vocabulario_expandido")
 
    //Parquet files can also be registered as tables and then used in SQL statements.
    parquetFile.registerTempTable("dicionario")
    
-    val parquetFileAnewbrT = sqlContext.parquetFile("data/parquet/ANEWbrT")
-
-   //Parquet files can also be registered as tables and then used in SQL statements.
-   parquetFileAnewbrT.registerTempTable("dicionario_anew")
    
     
+    
+val sentenceDataFrame = sqlContext.createDataFrame(Seq(
+  (0, "Este governo esta muito ruim"),
+  (1, "Temos um bom resultado nas contas publicas este semestre"),
+  (2, "A saca do cafe esta em otima")
+)).toDF("label", "sentence")
+
+
+val sentenceData = sqlContext.createDataFrame(Seq(
+  (0, "Hi I heard about Spark"),
+  (0, "I wish Java could use case classes"),
+  (1, "Logistic regression models are neat")
+)).toDF("label", "sentence")
+val tokenizer1 = new Tokenizer().setInputCol("sentence").setOutputCol("words")
+val wordsData1 = tokenizer1.transform(sentenceData)
+val hashingTF1 = new HashingTF().setInputCol("words").setOutputCol("rawFeatures").setNumFeatures(20)
+val featurizedData1 = hashingTF1.transform(wordsData1)
+val idf1 = new IDF().setInputCol("rawFeatures").setOutputCol("features")
+val idfModel1 = idf1.fit(featurizedData1)
+val rescaledData1 = idfModel1.transform(featurizedData1)
+rescaledData1.select("words","features", "label").take(10).foreach(println)
+
+
 
    // usage exampe -- a tpc-ds table called catalog_page
-  def schemaClippings= StructType(Array(
+  def schema= StructType(Array(
           StructField("date",        StringType,false),
           StructField("doc_id",        IntegerType,false),
           StructField("cat",          StringType,false),
@@ -79,67 +98,59 @@ teenagers.map(t => "Name: " + t(1)).collect().foreach(println)
        )) 
 
 
-  val dfClippings = sqlContext.read
+ val df = sqlContext.read
         .format("com.databricks.spark.csv")
-        .schema(schemaClippings)        
+        .schema(schema)        
         .option("header", "true")
         .option("charset", "UTF8")
         .option("delimiter",",")
         .option("nullValue","")
         .option("treatEmptyValuesAsNulls","true")
         .load("data/clippings_newformat.csv")
-        
-     // usage exampe -- a tpc-ds table called catalog_page
-  def schemaAnew= StructType(Array(
-          StructField("palavra",        StringType,false),
-          StructField("valencia_media", FloatType,false),
-          StructField("valencia_dp", FloatType,false),
-          StructField("alerta_media", FloatType,false),
-          StructField("alerta_dp", FloatType,false)
-       )) 
-
-
-  val dfAnew = sqlContext.read
-        .format("com.databricks.spark.csv")
-        .schema(schemaAnew)        
-        .option("header", "true")
-        .option("charset", "UTF8")
-        .option("delimiter",",")
-        .option("nullValue","")
-        .option("treatEmptyValuesAsNulls","true")
-        .load("data/ANEWbrT")
-             
-        
-//dfAnew.registerTempTable("dicionario_anew")
-           
-dfAnew.show()        
 
 val tokenizer = new Tokenizer().setInputCol("text").setOutputCol("words")
-
-val tokenizedClippings = tokenizer.transform(dfClippings)
-
-tokenizedClippings.registerTempTable("clipping")
- 
-
-val rdd1 = sqlContext.sql("SELECT date,doc_id,cat,sub_cat,text, explode(words) as palavra  FROM clipping").registerTempTable("sentencas")
-
-val resultset_int1 = sqlContext.sql("SELECT * FROM sentencas  JOIN dicionario_anew ON  sentencas.palavra = dicionario_anew.palavra")
-
-resultset_int1.show()
-
-val resultset_int = sqlContext.sql("SELECT date,doc_id,cat,sub_cat,text,sentencas.palavra as palavra,negativo,positivo  FROM sentencas LEFT OUTER JOIN dicionario ON  sentencas.palavra = dicionario.palavra")
-
-resultset_int.registerTempTable("passo1")
+//val tokenizer = new Tokenizer().setInputCol("sentence").setOutputCol("words")
 
 
-resultset_int.show()
+
+val tokenized = tokenizer.transform(df)
+  
+val hashingTF = new HashingTF().setInputCol("words").setOutputCol("rawFeatures")
+
+    val featurizedData = hashingTF.transform(tokenized)
+    
+    
+    featurizedData.registerTempTable("tmp")
+    
+    
+    val idf = new IDF().setInputCol("rawFeatures").setOutputCol("features")
+    val idfModel = idf.fit(featurizedData)
+    val rescaledData = idfModel.transform(featurizedData)
+
+    
+
+//val tokenized = tokenizer.transform(df).registerTempTable("tmp")
+
+
+
+val rdd1 = sqlContext.sql("SELECT date,doc_id,cat,sub_cat, explode(words) as palavra , rawFeatures FROM tmp").registerTempTable("sentencas")
+
+val rdd2 = sqlContext.sql("SELECT * FROM tmp")
+
+rdd2.show()
+
+
+//val rdd1 = sqlContext.sql("SELECT label, explode(words) as palavra FROM tmp").registerTempTable("sentencas")
+
+
+val resultset = sqlContext.sql("SELECT *  FROM sentencas,dicionario WHERE sentencas.palavra = dicionario.palavra")
+
+resultset.show()
+
 //
-//val resultset = sqlContext.sql("SELECT *  FROM passo1 LEFT OUTER JOIN dicionario_anew ON passo1.palavra = dicionario_anew.palavra")
+//val resultset2 = sqlContext.sql("SELECT count(*) as quantidade, sentencas.palavra  FROM sentencas,dicionario WHERE sentencas.palavra = dicionario.palavra group by sentencas.palavra order by quantidade desc")
 //
-//
-//resultset.show()
-
-
+//resultset2.show()
 
     sc.stop()
   }

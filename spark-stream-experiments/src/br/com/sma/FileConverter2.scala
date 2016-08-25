@@ -12,12 +12,12 @@ import org.apache.spark.sql.types.IntegerType
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.types.LongType
 import org.apache.spark.sql.types.FloatType
-import org.apache.spark.rdd.RDD
 
-object FileConverter {
+object FileConverter2 {
   
-   
- def convert(sqlContext: SQLContext, filename: String, schema: StructType, tablename: String) {
+ 
+ 
+  def convert(sqlContext: SQLContext, filename: String, schema: StructType, tablename: String) {
       // import text-based table first into a data frame.
       // make sure to use com.databricks:spark-csv version 1.3+ 
       // which has consistent treatment of empty strings as nulls.
@@ -33,38 +33,36 @@ object FileConverter {
       // now simply write to a parquet file
       df.write.parquet("data/parquet/"+tablename)
   }
+   
  
   
   def main(args: Array[String]): Unit = {
     
   System.setProperty("hadoop.home.dir", "C:\\hadoop-common-2.2.0-bin-master");  
   
- 
-  val conf = new SparkConf().setAppName("FileConverter").setMaster("local[*]")
+  
+  
+  
+  
+  val conf = new SparkConf().setAppName("Word2VecExample").setMaster("local[*]")
   val sc = new SparkContext(conf)
   val sqlContext = new org.apache.spark.sql.SQLContext(sc)
-
-  val input = sc.textFile("data/ANEW-Br.txt").cache().map(line => TextUtils.removerAcentos(line).toLowerCase().split(" ").mkString)
-
-  val header: RDD[String] = sc.parallelize(Array("palavra,valencia_media,valencia_dp,alerta_media,alerta_dp"))
-  
-   header.union(input).coalesce(1, true).saveAsTextFile("data/ANEW-Br-tratado.txt") 
-
-     // usage exampe -- a tpc-ds table called catalog_page
-  def schemaAnew= StructType(Array(
+ 
+    // usage exampe -- a tpc-ds table called catalog_page
+  def schema= StructType(Array(
           StructField("palavra",        StringType,false),
-          StructField("valencia_media", FloatType,false),
-          StructField("valencia_dp", FloatType,false),
-          StructField("alerta_media", FloatType,false),
-          StructField("alerta_dp", FloatType,false)
+          StructField("negativo",        FloatType,false),
+          StructField("positivo",          FloatType,false)
        )) 
+
        
        
   convert(sqlContext,
-          "data/ANEWbrT",  schemaAnew,        
-          "ANEWbrT")
+          "data/clippings_expandido.csv",  schema,        
+          "vocabulario_expandido")
   
    
+
     sc.stop()
   }
 }
