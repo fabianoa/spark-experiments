@@ -44,12 +44,15 @@ object FileConverter {
   val sc = new SparkContext(conf)
   val sqlContext = new org.apache.spark.sql.SQLContext(sc)
 
-  val input = sc.textFile("data/ANEW-Br.txt").cache().map(line => TextUtils.removerAcentos(line).toLowerCase().split(" ").mkString)
+  val input = sc.textFile("data/stopwords.txt").cache().map(line => TextUtils.removerAcentos(line).toLowerCase().split(" ").mkString)
 
-  val header: RDD[String] = sc.parallelize(Array("palavra,valencia_media,valencia_dp,alerta_media,alerta_dp"))
-  
-   header.union(input).coalesce(1, true).saveAsTextFile("data/ANEW-Br-tratado.txt") 
+ 
+ // val header: RDD[String] = sc.parallelize(Array("palavra,valencia_media,valencia_dp,alerta_media,alerta_dp"))
+ 
+  // header.union(input).coalesce(1, true).saveAsTextFile("data/ANEW-Br-tratado.txt") 
+    input.coalesce(1, true).saveAsTextFile("data/stopwords-br") 
 
+   
      // usage exampe -- a tpc-ds table called catalog_page
   def schemaAnew= StructType(Array(
           StructField("palavra",        StringType,false),
@@ -60,10 +63,10 @@ object FileConverter {
        )) 
        
        
-  convert(sqlContext,
-          "data/ANEWbrT",  schemaAnew,        
-          "ANEWbrT")
-  
+//  convert(sqlContext,
+//          "data/ANEWbrT",  schemaAnew,        
+//          "ANEWbrT")
+//  
    
     sc.stop()
   }

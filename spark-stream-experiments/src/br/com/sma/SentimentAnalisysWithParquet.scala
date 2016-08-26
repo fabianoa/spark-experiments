@@ -21,6 +21,8 @@ import org.apache.spark.ml.feature.{HashingTF, IDF, Tokenizer}
 import org.apache.spark.sql.types.FloatType
 import org.apache.spark.sql.functions.monotonicallyIncreasingId
 import org.apache.spark.sql.types.TimestampType
+import org.apache.spark.ml.feature.StopWordsRemover
+import org.apache.spark.ml.Pipeline
 
 
 object SentimentAnalisysWithParquet {
@@ -28,18 +30,21 @@ object SentimentAnalisysWithParquet {
 	val conf = new SparkConf().setAppName("SentimentAnalisysWithParquet").setMaster("local[*]")
 	val sc = new SparkContext(conf)
 	val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+  
+	
 
-
-      def loadDictionariesParquet{
+    def loadDictionariesParquet{
 	  
 	      	val parquetFile = sqlContext.parquetFile("data/parquet/vocabulario_expandido")
 					parquetFile.registerTempTable("dicionario_expandido")
 
 					val parquetFileAnewbrT = sqlContext.parquetFile("data/parquet/ANEWbrT")
 					parquetFileAnewbrT.registerTempTable("dicionario_anew")
-	  
-	   }
-	     
+					
+        
+	}      
+          
+          
 	   def loadDictionariesCSV{
 	        
 	      
@@ -100,8 +105,6 @@ object SentimentAnalisysWithParquet {
 					)) 
 
 
-
-
 					val dfClippings = sqlContext.read
    						.format("com.databricks.spark.csv")
 							.schema(schemaClippings)        
@@ -112,16 +115,40 @@ object SentimentAnalisysWithParquet {
 							.option("treatEmptyValuesAsNulls","true")
 							.load("data/clippings_newformat.csv")
 
-           val newDf = dfClippings.withColumn("uniqueIdColumn", monotonicallyIncreasingId())		
+          
+        val newDf = dfClippings.withColumn("uniqueIdColumn", monotonicallyIncreasingId())		
 						
+//      
+//				val tokenizer = new Tokenizer().setInputCol("text").setOutputCol("words")
+//				val tokenizedClippings = tokenizer.transform(newDf)
+//		
+				
+				val regex = new RegexTokenizer().setInputCol("text").setOutputCol("words").setMinTokenLength(3) // alternatively .setPattern("\\w+").setGaps(false)
+        val regexed = regex.transform(newDf)
+       
+        
       
-					val tokenizer = new Tokenizer().setInputCol("text").setOutputCol("words")
-					val tokenizedClippings = tokenizer.transform(newDf)
-		    			tokenizedClippings.registerTempTable("clipping")
+        val stopWords = sc.textFile("data/stopwords-br.txt").cache().toArray()
+       	val remover = new StopWordsRemover().setStopWords(stopWords).setInputCol("words").setOutputCol("filtered")
+		    val stopwordRemoved = remover.transform(regexed).registerTempTable("clipping")
+    
+		    
+        val pipeline = new Pipeline().setStages(Array( regex, remover))
+        val model = pipeline.fit(newDf).transform(newDf)
+      
+      
+        
 
-					val tokenizedClippingsExploded = sqlContext.sql("SELECT uniqueIdColumn,date,doc_id,cat,sub_cat,text, explode(words) as palavra  FROM clipping").registerTempTable("clippings_explodidos")
+      
+                
+        
 
-					val resultset = sqlContext.sql("SELECT uniqueIdColumn as doc_id , date,cat,sub_cat,text,clippings_explodidos.palavra as palavra,negativo,positivo,valencia_media,valencia_dp,alerta_media,alerta_dp  FROM clippings_explodidos LEFT OUTER JOIN dicionario_expandido ON  clippings_explodidos.palavra = dicionario_expandido.palavra LEFT OUTER JOIN dicionario_anew ON  clippings_explodidos.palavra = dicionario_anew.palavra")
+				val tokenizedClippingsExploded = sqlContext.sql("SELECT uniqueIdColumn,date,doc_id,cat,sub_cat,text, explode(filtered) as palavra  FROM clipping")
+				tokenizedClippingsExploded.registerTempTable("clippings_explodidos")
+       
+	          
+          
+				val resultset = sqlContext.sql("SELECT uniqueIdColumn as doc_id , date,cat,sub_cat,text,clippings_explodidos.palavra as palavra,negativo,positivo,valencia_media,valencia_dp,alerta_media,alerta_dp  FROM clippings_explodidos LEFT OUTER JOIN dicionario_expandido ON  clippings_explodidos.palavra = dicionario_expandido.palavra LEFT OUTER JOIN dicionario_anew ON  clippings_explodidos.palavra = dicionario_anew.palavra")
 
 					resultset.show(50)
 					
@@ -130,7 +157,7 @@ object SentimentAnalisysWithParquet {
 					
 					//resultset.select("palavra","valencia_media").filter("valencia_media is not null").orderBy("palavra").groupBy("palavra","valencia_media").count().orderBy("count").show(1000)
 					
-					 resultset.write.parquet("data/parquet/sentimento")
+					resultset.write.parquet("data/parquet/sentimento")
 
 				 sc.stop()
 	}
