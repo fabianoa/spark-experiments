@@ -123,7 +123,8 @@ object SentimentAnalisysWithParquet {
 //				val tokenizedClippings = tokenizer.transform(newDf)
 //		
 				
-				val regex = new RegexTokenizer().setInputCol("text").setOutputCol("words").setMinTokenLength(3) // alternatively .setPattern("\\w+").setGaps(false)
+				val regex = new RegexTokenizer().setInputCol("text").setOutputCol("words").setPattern("[a-zA-Z']+")
+        .setGaps(false) // alternatively .setPattern("\\w+").setGaps(false)
         val regexed = regex.transform(newDf)
        
         
